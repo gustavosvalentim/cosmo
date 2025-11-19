@@ -9,10 +9,16 @@ type DBService interface {
 	Get() error
 }
 
-type SQLDBService struct {}
+type Config struct {
+	URL string
+}
+
+type SQLDBService struct{
+	Config Config
+}
 
 func (svc *SQLDBService) Get() error {
-	fmt.Println("db service")
+	fmt.Printf("Database URL: %s\n", svc.Config.URL)
 	return nil
 }
 
@@ -23,14 +29,28 @@ type ToBind struct {
 func TestContainer(t *testing.T) {
 	c := New()
 
-	err := c.Add(func () DBService {
-		return &SQLDBService{}
+	singletonConstructorCallTimes := 0
+
+	err := c.AddSingleton(func() Config {
+		singletonConstructorCallTimes++
+		return Config{
+			URL: "sqlite://test.db",
+		}
 	})
 	if err != nil {
 		t.Error(err.Error())
 	}
 
-	err = c.Invoke(func (db DBService) {
+	err = c.Add(func(cfg Config) DBService {
+		return &SQLDBService{
+			Config: cfg,
+		}
+	})
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	err = c.Invoke(func(db DBService) {
 		db.Get()
 	})
 	if err != nil {
@@ -43,4 +63,8 @@ func TestContainer(t *testing.T) {
 	}
 
 	bnd.DB.Get()
+
+	if singletonConstructorCallTimes != 1 {
+		t.Errorf("Singleton constructor was called %d times", singletonConstructorCallTimes)
+	}
 }
